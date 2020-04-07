@@ -1,3 +1,6 @@
 [submodule "frap"]
 	path = frap
 	url = git@github.com:achlipala/frap.git
+[submodule "homework"]
+	path = homework
+	url = git@github.com:samtay/cse505-homework.git
