@@ -58,3 +58,9 @@ Proof.
   induct H.
   contradiction.
 Qed.
+
+(* We also have True which, contrastly, is immediately producable! *)
+Print True.
+(*
+Inductive True : Prop :=  I : True
+*)
