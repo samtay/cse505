@@ -553,7 +553,104 @@ Module Stlc.
     -> value e
     \/ (exists e' : exp, step e e').
   Proof.
-  Admitted.
+    induct 1; simplify; try equality.
+
+    left.
+    constructor.
+
+    propositional.
+
+    right.
+    match goal with
+    | [ H1 : value e1, H2 : hasty $0 e1 _ |- _ ] => invert H1; invert H2
+    end.
+    match goal with
+    | [ H1 : value e2, H2 : hasty $0 e2 _ |- _ ] => invert H1; invert H2
+    end.
+    exists (Const (n + n0)).
+    eapply StepRule with (C := Hole).
+    eauto.
+    eauto.
+    constructor.
+
+    match goal with
+    | [ H : exists x, _ |- _ ] => invert H
+    end.
+    match goal with
+    | [ H : step _ _ |- _ ] => invert H
+    end.
+    right.
+    eauto.
+
+    match goal with
+    | [ H : exists x, _ |- _ ] => invert H
+    end.
+    match goal with
+    | [ H : step _ _ |- _ ] => invert H
+    end.
+    right.
+    eauto.
+
+    match goal with
+    | [ H : exists x, step e1 _ |- _ ] => invert H
+    end.
+    match goal with
+    | [ H : step _ _ |- _ ] => invert H
+    end.
+    right.
+    exists (Plus x e2).
+    eapply StepRule with (C := Plus1 C e2).
+    eauto.
+    eauto.
+    assumption.
+
+    left.
+    constructor.
+
+    propositional.
+
+    right.
+    match goal with
+    | [ H1 : value e1, H2 : hasty $0 e1 _ |- _ ] => invert H1; invert H2
+    end.
+    exists (subst e2 x e0).
+    eapply StepRule with (C := Hole).
+    eauto.
+    eauto.
+    constructor.
+    assumption.
+
+    match goal with
+    | [ H : exists x, _ |- _ ] => invert H
+    end.
+    match goal with
+    | [ H : step _ _ |- _ ] => invert H
+    end.
+    right.
+    eauto.
+
+    match goal with
+    | [ H : exists x, _ |- _ ] => invert H
+    end.
+    match goal with
+    | [ H : step _ _ |- _ ] => invert H
+    end.
+    right.
+    eauto.
+
+    match goal with
+    | [ H : exists x, step e1 _ |- _ ] => invert H
+    end.
+    match goal with
+    | [ H : step _ _ |- _ ] => invert H
+    end.
+    right.
+    exists (App x e2).
+    eapply StepRule with (C := App1 C e2).
+    eauto.
+    eauto.
+    assumption.
+  Qed.
 
   (* Replacing a typing context with an equal one has no effect (useful to guide
    * proof search as a hint). *)
@@ -562,16 +659,108 @@ Module Stlc.
     -> forall G', G' = G
       -> hasty G' e t.
   Proof.
-  Admitted.
+    induct 1; simplify; constructor || econstructor.
+    rewrite H0, H; equality.
+    rewrite H1. assumption.
+    rewrite H1. assumption.
+    rewrite H0. assumption.
+    rewrite H1. eassumption.
+    rewrite H1. eassumption.
+  Qed.
 
   Hint Resolve hasty_change.
+
+  Lemma weakening : forall G e t,
+    hasty G e t
+    -> forall G', (forall x t, G $? x = Some t -> G' $? x = Some t)
+      -> hasty G' e t.
+  Proof.
+    induct 1; simplify.
+    constructor. apply H0, H.
+    constructor.
+    constructor; apply IHhasty1 || apply IHhasty2; assumption.
+    constructor. apply IHhasty. simplify. cases (x ==v x0); simplify; eauto.
+    econstructor; apply IHhasty1 || apply IHhasty2; assumption.
+  Qed.
+
+  (* Replacing a variable with a properly typed term preserves typing. *)
+  Lemma substitution : forall G x t' e t e',
+    hasty (G $+ (x, t')) e t
+    -> hasty $0 e' t'
+    -> hasty G (subst e' x e) t.
+  Proof.
+    induct 1; simplify.
+    - cases (x0 ==v x); simplify.
+      * invert H. apply weakening with (G := $0); auto.
+      * constructor. assumption.
+    - constructor.
+    - constructor; (eapply IHhasty1 || eapply IHhasty2); eauto.
+    - constructor. cases (x0 ==v x).
+      * eapply weakening.
+        + eassumption.
+        + simplify. rewrite e. cases (x ==v x1); simplify; assumption.
+      * eapply IHhasty; eauto.
+    - econstructor.
+      * eapply IHhasty1; eauto.
+      * eapply IHhasty2; eauto.
+  Qed.
+
+  Lemma preservation0 : forall e1 e2,
+    step0 e1 e2
+    -> forall t, hasty $0 e1 t
+      -> hasty $0 e2 t.
+  Proof.
+    invert 1; simplify.
+    - invert H.
+      invert H4.
+      eapply substitution; eassumption.
+    - invert H.
+      constructor.
+  Qed.
+
+  Lemma generalize_plug : forall e1 C e1',
+    plug C e1 e1'
+    -> forall e2 e2', plug C e2 e2'
+      -> (forall t, hasty $0 e1 t -> hasty $0 e2 t)
+      -> (forall t, hasty $0 e1' t -> hasty $0 e2' t).
+  Proof.
+    induct 1; simplify.
+
+    - invert H. auto.
+    - invert H0.
+      invert H2.
+      constructor.
+      + eapply IHplug; eassumption.
+      + assumption.
+    - invert H1.
+      invert H3.
+      constructor; try assumption.
+      + eapply IHplug; eassumption.
+    - invert H0.
+      invert H2.
+      econstructor.
+      + eapply IHplug; eassumption.
+      + assumption.
+    - invert H1.
+      invert H3.
+      econstructor.
+      + eassumption.
+      + eapply IHplug; eassumption.
+  Qed.
 
   Lemma preservation : forall e1 e2,
     step e1 e2
     -> forall t, hasty $0 e1 t
       -> hasty $0 e2 t.
   Proof.
-  Admitted.
+    invert 1; simplify.
+    eapply generalize_plug with (e1' := e1).
+    - eassumption.
+    - eassumption.
+    - simplify.
+      eapply preservation0; eassumption.
+    - assumption.
+  Qed.
 
   Theorem safety : forall e t, hasty $0 e t
     -> invariantFor (trsys_of e) unstuck.
