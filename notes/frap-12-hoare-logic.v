@@ -222,7 +222,8 @@ Theorem swap_ok : forall a b,
     "y" <- "tmp"
   {{_&v ~> v $! "x" = b /\ v $! "y" = a}}.
 Proof.
-Admitted.
+  ht.
+Qed.
 
 (** ** Computing the maximum of two variables *)
 
@@ -235,21 +236,37 @@ Theorem max_ok : forall a b,
     done
   {{_&v ~> v $! "m" = max a b}}.
 Proof.
-Admitted.
+  ht.
+Qed.
 
 (** ** Iterative factorial *)
+Lemma fact_base : forall n,
+  n = 0
+  -> fact n = 1.
+Proof.
+  simplify; subst; auto.
+Qed.
+Hint Rewrite <- minus_n_O.
+Lemma fact_rec : forall n,
+  n > 0
+  -> fact n = n * fact (n - 1).
+Proof.
+  simplify; cases n; simplify; linear_arithmetic.
+Qed.
+Hint Rewrite fact_base fact_rec using linear_arithmetic.
 
 Theorem fact_ok : forall n,
   {{_&v ~> v $! "n" = n}}
     "acc" <- 1;;
-    {{_&v ~> True}}
+    {{_&v ~> v $! "acc" * fact (v $! "n") = fact n}} (*Strengthen IH*)
     while 0 < "n" loop
       "acc" <- "acc" * "n";;
       "n" <- "n" - 1
     done
   {{_&v ~> v $! "acc" = fact n}}.
 Proof.
-Admitted.
+  ht.
+Qed.
 
 (** ** Selection sort *)
 
@@ -273,11 +290,17 @@ Hint Extern 1 (_ <= _) => linear_arithmetic.
 Theorem selectionSort_ok :
   {{_&_ ~> True}}
     "i" <- 0;;
-    {{h&v ~> True}}
+    {{h&v ~> v $! "i" <= v $! "n"
+        /\ (forall i j, i < j < v $! "i" -> h $! (v $! "a" + i) <= h $! (v $! "a" + j))
+        /\ (forall i j, i < v $! "i" -> v $! "i" <= j < v $! "n" -> h $! (v $! "a" + i) <= h $! (v $! "a" + j)) }}
     while "i" < "n" loop
       "j" <- "i"+1;;
       "best" <- "i";;
-      {{h&v ~> True}}
+      {{h&v ~> v $! "i" < v $! "j" <= v $! "n"
+         /\ v $! "i" <= v $! "best" < v $! "n"
+         /\ (forall k, v $! "i" <= k < v $! "j" -> h $! (v $! "a" + v $! "best") <= h $! (v $! "a" + k))
+         /\ (forall i j, i < j < v $! "i" -> h $! (v $! "a" + i) <= h $! (v $! "a" + j))
+         /\ (forall i j, i < v $! "i" -> v $! "i" <= j < v $! "n" -> h $! (v $! "a" + i) <= h $! (v $! "a" + j)) }}
       while "j" < "n" loop
         when *["a" + "j"] < *["a" + "best"] then
           "best" <- "j"
@@ -293,11 +316,17 @@ Theorem selectionSort_ok :
     done
   {{h&v ~> forall i j, i < j < v $! "n" -> h $! (v $! "a" + i) <= h $! (v $! "a" + j)}}.
 Proof.
-Admitted.
+  ht; repeat match goal with
+             | [ |- context[_ $+ (?a + ?x, _) $! (?a + ?y)] ] =>
+               cases (x ==n y); ht
+             end.
+  cases (k ==n x0 $! "j"); ht.
+  specialize (H k); ht.
+  cases (k ==n x $! "j"); ht.
+Qed.
 
 
 (** * An alternative correctness theorem for Hoare logic, with small-step semantics *)
-
 Inductive step : heap * valuation * cmd -> heap * valuation * cmd -> Prop :=
 | StAssign : forall h v x e,
   step (h, v, Assign x e) (h, v $+ (x, eval e h v), Skip)
